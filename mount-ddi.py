@@ -1,0 +1,86 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+一键给 USB 连接的 iOS 设备挂载 Developer Disk Image(DDI)。跨平台:Windows / macOS / Linux。
+
+为什么需要它:
+  裸启动 WDA 需要 testmanagerd 的 .control 服务,而它只在 DDI 挂载后才存在。
+  Dopamine(rootless)禁掉了裸 mount 语法、/Developer 又在密封卷上,无法在设备侧固化;
+  所以用电脑经 USB 走 Apple 授权的 image-mounter 挂(这条不受设备侧 mount 限制)。
+  ⚠️ 重启后 DDI 会掉,重连 USB 再跑一次本脚本即可。
+
+依赖:pymobiledevice3(纯 Python,自动 pip 安装)。设备需先"信任此电脑"。
+
+用法:
+  python mount-ddi.py            # 自动匹配 iOS 版本、联网取对应 DDI 并挂载
+  python mount-ddi.py --umount   # 卸载
+  python mount-ddi.py --list     # 看已挂载镜像
+"""
+import importlib.util
+import subprocess
+import sys
+
+
+def _has(mod):
+    return importlib.util.find_spec(mod) is not None
+
+
+def _pmd(*args, capture=False):
+    """调 pymobiledevice3 子命令。"""
+    cmd = [sys.executable, "-m", "pymobiledevice3", *args]
+    print("  $ pymobiledevice3", *args)
+    if capture:
+        return subprocess.run(cmd, capture_output=True, text=True)
+    return subprocess.run(cmd)
+
+
+def ensure_dep():
+    if _has("pymobiledevice3"):
+        return True
+    print("[*] 未装 pymobiledevice3,自动安装中(需联网)…")
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "-U", "pymobiledevice3"])
+        return True
+    except Exception as e:
+        print("[!] 自动安装失败。请手动执行:  pip install -U pymobiledevice3")
+        print("   ", e)
+        return False
+
+
+def main(argv):
+    if not ensure_dep():
+        return 1
+
+    if "--list" in argv:
+        # 不同版本子命令名可能是 list 或 query;两个都试。
+        r = _pmd("mounter", "list", capture=True)
+        if r.returncode != 0:
+            r = _pmd("mounter", "query", capture=True)
+        print(((r.stdout or "") + (r.stderr or "")).strip())
+        return r.returncode
+    if "--umount" in argv or "--unmount" in argv:
+        return _pmd("mounter", "umount").returncode
+
+    # 设备检测仅提示、不拦(输出格式各版本不一);真正判定交给 auto-mount。
+    print("[*] 连接的设备(需已解锁 + 信任此电脑):")
+    _pmd("usbmux", "list")
+
+    print("\n[*] 自动挂载 Developer Disk Image(按设备 iOS 版本联网取对应 DDI)…")
+    r = _pmd("mounter", "auto-mount", capture=True)
+    combined = (r.stdout or "") + (r.stderr or "")
+    print(combined.strip())
+    low = combined.lower()
+    if r.returncode == 0 or "already mounted" in low or "developerdiskimage already" in low:
+        print("\n[✓] DDI 已就位!现在点开 WDA(WebDriverAgentRunner)即可裸启动跑通。")
+        print("    重启设备后 DDI 会掉,重连 USB 再跑一次本脚本。")
+        return 0
+
+    print("\n[!] 挂载失败。排查:")
+    print("    - 设备没信任此电脑 → 解锁后弹窗点信任,或跑 `pymobiledevice3 lockdown pair`")
+    print("    - 没联网 → auto-mount 要从网上取对应 iOS 版本的 DDI")
+    print("    - iOS 17+ 需开发者模式(设置>隐私与安全>开发者模式)")
+    return r.returncode or 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
