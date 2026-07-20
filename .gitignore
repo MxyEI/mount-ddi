@@ -21,3 +21,6 @@ env/
 # OS / IDE
 .DS_Store
 /.idea/
+
+# 离线 DDI 镜像(版权属 Apple,各自本地准备;只跟踪说明)
+/ddi/*/
