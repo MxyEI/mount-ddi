@@ -20,6 +20,10 @@ import importlib.util
 import subprocess
 import sys
 
+# 打包成 exe(PyInstaller)后,靠这个哨兵参数让 exe 把自己当作 pymobiledevice3 CLI 来跑。
+_PMD_FLAG = "--__run_pymobiledevice3__"
+_FROZEN = getattr(sys, "frozen", False)
+
 
 def _has(mod):
     return importlib.util.find_spec(mod) is not None
@@ -27,7 +31,11 @@ def _has(mod):
 
 def _pmd(*args, capture=False):
     """调 pymobiledevice3 子命令。"""
-    cmd = [sys.executable, "-m", "pymobiledevice3", *args]
+    if _FROZEN:
+        # exe 里没有 `python -m`,改成重新调用自身、走内置的 pymobiledevice3 分发器。
+        cmd = [sys.executable, _PMD_FLAG, *args]
+    else:
+        cmd = [sys.executable, "-m", "pymobiledevice3", *args]
     print("  $ pymobiledevice3", *args)
     if capture:
         return subprocess.run(cmd, capture_output=True, text=True)
@@ -35,8 +43,8 @@ def _pmd(*args, capture=False):
 
 
 def ensure_dep():
-    if _has("pymobiledevice3"):
-        return True
+    if _FROZEN or _has("pymobiledevice3"):
+        return True  # exe 已内置 pymobiledevice3,无需 pip
     print("[*] 未装 pymobiledevice3,自动安装中(需联网)…")
     try:
         subprocess.check_call([sys.executable, "-m", "pip", "install", "-U", "pymobiledevice3"])
@@ -82,5 +90,19 @@ def main(argv):
     return r.returncode or 1
 
 
+def _run_as_pymobiledevice3():
+    """冻结态下,把自身当作 `python -m pymobiledevice3` 执行。"""
+    import multiprocessing
+
+    multiprocessing.freeze_support()
+    from pymobiledevice3.__main__ import main as pmd_main
+
+    sys.argv = ["pymobiledevice3", *sys.argv[2:]]  # 去掉 exe 路径和哨兵参数
+    pmd_main()
+
+
 if __name__ == "__main__":
+    if _FROZEN and len(sys.argv) > 1 and sys.argv[1] == _PMD_FLAG:
+        _run_as_pymobiledevice3()
+        sys.exit(0)
     sys.exit(main(sys.argv[1:]))

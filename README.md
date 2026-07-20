@@ -15,6 +15,16 @@
 
 首次会自动 `pip install pymobiledevice3`(纯 Python、跨平台的 iOS 设备工具)。
 
+### 打包成独立 exe(目标机免装 Python)
+
+在**一台装了 Python 3 的 Windows** 上双击 `build-windows.bat`,即可把整套工具(含
+`pymobiledevice3`)打成单文件 `dist\mount-ddi.exe`。把这个 exe 拷到任意 Windows 机器双击运行,
+**无需安装 Python**。
+
+- 打包过程:自动建打包用虚拟环境 `.build-venv` → 装 `pyinstaller` + `pymobiledevice3` → 按
+  `mount-ddi.spec` 输出 `dist\mount-ddi.exe`。需联网。
+- exe 也支持参数:`mount-ddi.exe --list` / `mount-ddi.exe --umount`。
+
 ## 前置
 
 1. USB 连接设备、**解锁屏幕**、弹窗点**「信任此电脑」**(没配对过先跑 `pymobiledevice3 lockdown pair`)。

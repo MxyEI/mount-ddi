@@ -7,9 +7,13 @@ __pycache__/
 build/
 dist/
 .venv/
+.build-venv/
 venv/
 env/
 .env
+
+# PyInstaller
+*.manifest
 
 # Logs
 *.log
