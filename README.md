@@ -34,10 +34,27 @@
 ## 命令
 
 ```bash
-python mount-ddi.py            # 挂载(自动匹配版本)
+python mount-ddi.py            # 挂载(自动匹配版本,联网取 DDI)
+python mount-ddi.py --offline  # 离线挂:用本地 DDI,免联网(网络慢/无网时用)
 python mount-ddi.py --list     # 看已挂载镜像
 python mount-ddi.py --umount   # 卸载
 ```
+
+## 离线挂载(免联网)
+
+联网 `auto-mount` 慢或没网时,把 DDI 放本地按版本挂。iOS<17 是 `dmg` + `.signature` 两个文件,
+放到脚本旁 `ddi/<iOS版本>/`:
+
+```
+ddi/15.2/DeveloperDiskImage.dmg
+ddi/15.2/DeveloperDiskImage.dmg.signature
+```
+
+然后 `python mount-ddi.py --offline`(按设备 ProductVersion 自动匹配:先精确 `15.2`,再退回 `15.x`)。
+也可显式指定:`python mount-ddi.py --image X.dmg --sig X.dmg.signature`。
+
+镜像来源:公开的 DeveloperDiskImage 汇总仓库,或装了对应 Xcode 的机器
+`.../iPhoneOS.platform/DeviceSupport/<版本>/DeveloperDiskImage.dmg`。
 
 ## 挂上之后
 
