@@ -78,12 +78,22 @@ def main(argv):
     combined = (r.stdout or "") + (r.stderr or "")
     print(combined.strip())
     low = combined.lower()
-    if r.returncode == 0 or "already mounted" in low or "developerdiskimage already" in low:
+
+    # 已挂载视为成功。注意:pymobiledevice3 把「设备没连」当作已处理的错误,
+    # 只打一条 ERROR 日志、退出码仍是 0,所以不能只看 returncode——
+    # 输出里出现 error / not connected / traceback 一律判失败,避免误报成功。
+    already = "already mounted" in low or "developerdiskimage already" in low
+    errored = any(k in low for k in ("error", "not connected", "traceback", "failed", "no device"))
+    if already or (r.returncode == 0 and not errored):
         print("\n[✓] DDI 已就位!现在点开 WDA(WebDriverAgentRunner)即可裸启动跑通。")
         print("    重启设备后 DDI 会掉,重连 USB 再跑一次本脚本。")
         return 0
 
     print("\n[!] 挂载失败。排查:")
+    if "not connected" in low or "no device" in low:
+        print("    - 电脑没识别到设备(usbmux 列表为空):")
+        print("      · Windows 需装 iTunes 或「Apple 设备」App(提供 Apple Mobile Device Service)")
+        print("      · 解锁设备并在弹窗点「信任此电脑」;换原装数据线 / 换 USB 口")
     print("    - 设备没信任此电脑 → 解锁后弹窗点信任,或跑 `pymobiledevice3 lockdown pair`")
     print("    - 没联网 → auto-mount 要从网上取对应 iOS 版本的 DDI")
     print("    - iOS 17+ 需开发者模式(设置>隐私与安全>开发者模式)")

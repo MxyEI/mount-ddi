@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 # PyInstaller 打包配置:把 mount-ddi.py + pymobiledevice3 打成单个 exe。
 # 用法:pyinstaller --noconfirm --clean mount-ddi.spec  (通常由 build-windows.bat 调用)
-from PyInstaller.utils.hooks import collect_all
+from PyInstaller.utils.hooks import collect_all, copy_metadata
 
 datas, binaries, hiddenimports = [], [], []
 
@@ -12,6 +12,15 @@ for pkg in ("pymobiledevice3", "typer", "typer_injector", "click", "coloredlogs"
     datas += d
     binaries += b
     hiddenimports += h
+
+# 部分包在 import 时用 importlib.metadata.version(...) 读自身发行版元数据(如 readchar、pyimg4),
+# collect_all 不会带上 *.dist-info;不显式 copy_metadata 就会 PackageNotFoundError。
+for pkg in ("readchar", "pyimg4", "click", "prompt_toolkit", "tqdm",
+            "inquirer3", "pymobiledevice3"):
+    try:
+        datas += copy_metadata(pkg)
+    except Exception:
+        pass  # 该环境未装此包则跳过
 
 a = Analysis(
     ["mount-ddi.py"],
