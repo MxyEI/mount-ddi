@@ -3,10 +3,14 @@ REM ============================================================
 REM  一键把 mount-ddi 打包成独立的 Windows exe(目标机免装 Python)。
 REM  双击本文件即可。产物:dist\mount-ddi.exe
 REM  需要:本机装有 Python 3(python.org,勾 Add to PATH)+ 联网。
+REM  可选:build-windows.bat --upgrade-deps 强制更新打包依赖。
 REM ============================================================
 setlocal enabledelayedexpansion
 chcp 65001 >nul
 cd /d "%~dp0"
+
+set "UPGRADE_DEPS="
+if /i "%~1"=="--upgrade-deps" set "UPGRADE_DEPS=1"
 
 echo ==== 打包 mount-ddi.exe ====
 echo.
@@ -32,10 +36,46 @@ if not exist "%VENV%\Scripts\python.exe" (
 )
 set "VPY=%VENV%\Scripts\python.exe"
 
-REM --- 3. 装依赖:pyinstaller + pymobiledevice3 ---
-echo [*] 安装/更新依赖(pyinstaller + pymobiledevice3)...
-"%VPY%" -m pip install -U pip >nul 2>nul
-"%VPY%" -m pip install -U pyinstaller pymobiledevice3 || ( echo [!] 依赖安装失败,检查网络 & pause & exit /b 1 )
+REM --- 3. 首次安装依赖;后续直接复用 .build-venv ---
+set "NEED_DEPS="
+"%VPY%" -c "import PyInstaller, pymobiledevice3" >nul 2>nul || set "NEED_DEPS=1"
+"%VPY%" -m pip check >nul 2>nul || set "NEED_DEPS=1"
+if defined UPGRADE_DEPS set "NEED_DEPS=1"
+
+if not defined NEED_DEPS (
+  echo [*] 打包依赖已安装,直接复用 %VENV% ^(不会重复下载^)。
+  goto deps_ready
+)
+
+echo [*] 正在探测国内 PyPI 镜像...
+set "PIP_UPGRADE="
+if defined UPGRADE_DEPS set "PIP_UPGRADE=--upgrade"
+set "DEPS_OK="
+set "PYPI_INDEX=%MOUNT_DDI_PYPI_INDEX%"
+if defined PYPI_INDEX (
+  echo [*] 先尝试环境变量指定的镜像: !PYPI_INDEX!
+  "%VPY%" -m pip install --disable-pip-version-check --prefer-binary --timeout 30 --retries 2 --index-url "!PYPI_INDEX!" !PIP_UPGRADE! pyinstaller pymobiledevice3
+  if not errorlevel 1 set "DEPS_OK=1"
+)
+
+if not defined DEPS_OK (
+  for /f "usebackq delims=" %%I in (`"%VPY%" "%~dp0select-pypi-mirror.py"`) do (
+    if not defined DEPS_OK (
+      echo [*] 尝试 PyPI 源: %%I
+      "%VPY%" -m pip install --disable-pip-version-check --prefer-binary --timeout 30 --retries 2 --index-url "%%I" !PIP_UPGRADE! pyinstaller pymobiledevice3
+      if not errorlevel 1 (
+        set "DEPS_OK=1"
+        set "PYPI_INDEX=%%I"
+      ) else (
+        echo [!] 当前源安装失败,自动切换下一个源...
+      )
+    )
+  )
+)
+if not defined DEPS_OK ( echo [!] 所有 PyPI 源均安装失败,请检查网络 & pause & exit /b 1 )
+echo [OK] 依赖安装完成,使用源: !PYPI_INDEX!
+
+:deps_ready
 
 REM --- 4. 清理旧产物 ---
 if exist "build" rmdir /s /q "build"

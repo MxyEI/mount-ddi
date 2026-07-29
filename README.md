@@ -24,6 +24,11 @@
 - 打包过程:自动建打包用虚拟环境 `.build-venv` → 装 `pyinstaller` + `pymobiledevice3` → 按
   `mount-ddi.spec` 输出 `dist\mount-ddi.exe`。需联网。
 - exe 也支持参数:`mount-ddi.exe --list` / `mount-ddi.exe --umount`。
+- 首次安装依赖会自动探测清华、阿里云、腾讯云、中科大镜像，按响应速度依次尝试可用国内源，
+  全部失败后才回退 PyPI 官方源；
+  后续打包直接复用 `.build-venv`，不会每次强制升级、重复下载。
+- 需要更新依赖时运行 `build-windows.bat --upgrade-deps`。也可在运行前设置
+  `MOUNT_DDI_PYPI_INDEX`，手动指定企业内网或其他 PyPI 镜像。
 
 ## 前置
 
