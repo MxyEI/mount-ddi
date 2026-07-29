@@ -13,25 +13,18 @@ iOS < 17(dmg + signature 两个文件):
   - 装了对应 Xcode 的机器:
     /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/DeviceSupport/<版本>/DeveloperDiskImage.dmg
 
+也可让脚本自动探测国内加速/直连网络并下载到本目录。例如 iOS 15.3.1 自动引用 15.3:
 
-• iOS 15.3.1 使用 15.3 的 DDI，没有单独的 15.3.1 镜像。
+    python mount-ddi.py --download-only --version 15.3.1
 
-  - DeveloperDiskImage.dmg
+终端会打印选中的下载链接、实时进度和最终引用目录。
 
-    (https://raw.githubusercontent.com/Mythologyli/DeveloperDiskImage/main/15.3/DeveloperDiskImage.dmg)
+iOS 15.3.1 使用 15.3 的 DDI，没有单独的 15.3.1 镜像。已有直链也可继续手动下载:
 
-  - DeveloperDiskImage.dmg.signature
+  - https://ghfast.top/https://raw.githubusercontent.com/doronz88/DeveloperDiskImage/main/DeveloperDiskImages/15.3/DeveloperDiskImage.dmg
+  - https://ghfast.top/https://raw.githubusercontent.com/doronz88/DeveloperDiskImage/main/DeveloperDiskImages/15.3/DeveloperDiskImage.dmg.signature
+  - https://raw.githubusercontent.com/Mythologyli/DeveloperDiskImage/main/15.3/DeveloperDiskImage.dmg
+  - https://raw.githubusercontent.com/Mythologyli/DeveloperDiskImage/main/15.3/DeveloperDiskImage.dmg.signature
+  - https://raw.githubusercontent.com/filsv/iOSDeviceSupport/master/15.3.zip
 
-    (https://raw.githubusercontent.com/Mythologyli/DeveloperDiskImage/main/15.3/DeveloperDiskImage.dmg.signature)
-
-  - 打包下载 15.3.zip
-    (https://raw.githubusercontent.com/filsv/iOSDeviceSupport/master/15.3.zip)
-
-  放置目录：
-
-  ddi/15.3.1/DeveloperDiskImage.dmg
-  ddi/15.3.1/DeveloperDiskImage.dmg.signature
-
-  然后运行：
-
-  python mount-ddi.py --offline
+手动下载的两个文件可放到 `ddi/15.3/`，然后运行 `python mount-ddi.py --offline`。

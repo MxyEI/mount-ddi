@@ -29,12 +29,13 @@
 
 1. USB 连接设备、**解锁屏幕**、弹窗点**「信任此电脑」**(没配对过先跑 `pymobiledevice3 lockdown pair`)。
 2. iOS 17+ 还需在 **设置 > 隐私与安全 > 开发者模式** 打开。
-3. 联网(auto-mount 按设备 iOS 版本从网上取对应 DDI)。
+3. 联网(脚本按设备 iOS 版本探测可用下载源并缓存对应 DDI)。
 
 ## 命令
 
 ```bash
 python mount-ddi.py            # 挂载(自动匹配版本,联网取 DDI)
+python mount-ddi.py --download-only --version 15.3.1  # 只下载并缓存,暂不挂载
 python mount-ddi.py --offline  # 离线挂:用本地 DDI,免联网(网络慢/无网时用)
 python mount-ddi.py --list     # 看已挂载镜像
 python mount-ddi.py --umount   # 卸载
@@ -50,11 +51,32 @@ ddi/15.2/DeveloperDiskImage.dmg
 ddi/15.2/DeveloperDiskImage.dmg.signature
 ```
 
-然后 `python mount-ddi.py --offline`(按设备 ProductVersion 自动匹配:先精确 `15.2`,再退回 `15.x`)。
+然后 `python mount-ddi.py --offline`(按设备 ProductVersion 自动匹配:如先精确 `15.3.1`,再退回 `15.3`)。
 也可显式指定:`python mount-ddi.py --image X.dmg --sig X.dmg.signature`。
 
 镜像来源:公开的 DeveloperDiskImage 汇总仓库,或装了对应 Xcode 的机器
 `.../iPhoneOS.platform/DeviceSupport/<版本>/DeveloperDiskImage.dmg`。
+
+## 自动下载与国内网络
+
+iOS 17 以下默认不再隐藏在 `pymobiledevice3 auto-mount` 中下载。脚本会并发探测以下入口，
+按探测响应速度选择下载源；下载中实时打印链接、引用/保存目录、百分比、大小和速度，失败后
+自动切换下一个源：
+
+- 国内加速：`ghfast.top`、`gh-proxy.com`、`ghproxy.net`
+- 直连回退：`raw.githubusercontent.com`
+
+文件取自 `pymobiledevice3` 使用的
+[`doronz88/DeveloperDiskImage`](https://github.com/doronz88/DeveloperDiskImage) 仓库。
+例如 iOS `15.3.1` 会自动匹配 `15.3`，缓存到 `ddi/15.3/`，以后运行直接复用。
+
+只下载指定版本、不连接设备：
+
+```bash
+python mount-ddi.py --download-only --version 15.3.1
+```
+
+也可用 `--ddi-dir <目录>` 修改下载及引用目录。
 
 ## 挂上之后
 
@@ -64,5 +86,5 @@ HTTP server 监听 `:8100`。控制端 `iproxy 8100:8100` 或同 WiFi 直连。
 ## 说明
 
 - 只依赖 `pymobiledevice3`(pip),不需要装 Xcode/libimobiledevice,Windows 也能用。
-- DDI 由 pymobiledevice3 联网获取(它维护了各 iOS 版本的 DeveloperDiskImage 仓库)。
+- DDI 来自 pymobiledevice3 使用的 DeveloperDiskImage 仓库，并由本脚本多源下载及缓存。
 - 这是"免固化、靠电脑挂一次"的方案 —— 相对设备侧固化更简单可靠;代价是每次重启要重挂。
