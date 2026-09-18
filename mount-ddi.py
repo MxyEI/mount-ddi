@@ -35,6 +35,7 @@ import re
 import subprocess
 import sys
 import time
+import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -53,6 +54,16 @@ _DDI_SOURCES = (
     ("国内加速 gh-proxy.com", "https://gh-proxy.com/{url}"),
     ("国内加速 ghproxy.net", "https://ghproxy.net/{url}"),
     ("GitHub 直连", "{url}"),
+)
+# 首次 pip 安装会先探测这些国内源，全部失败后再回退官方 PyPI。
+# 可用环境变量 MOUNT_DDI_PYPI_INDEX 指定企业内网或其他镜像。
+_PYPI_SOURCES = (
+    ("阿里云", "https://mirrors.aliyun.com/pypi/simple"),
+    ("清华 TUNA", "https://pypi.tuna.tsinghua.edu.cn/simple"),
+    ("华为云", "https://mirrors.huaweicloud.com/repository/pypi/simple"),
+    ("中科大", "https://pypi.mirrors.ustc.edu.cn/simple"),
+    ("腾讯云", "https://mirrors.cloud.tencent.com/pypi/simple"),
+    ("PyPI 官方", "https://pypi.org/simple"),
 )
 _USER_AGENT = "mount-ddi/1.0"
 _DOWNLOAD_CHUNK_SIZE = 256 * 1024
@@ -75,17 +86,91 @@ def _pmd(*args, capture=False):
     return subprocess.run(cmd)
 
 
+def _pypi_index_candidates():
+    env = (os.environ.get("MOUNT_DDI_PYPI_INDEX") or "").strip()
+    if env:
+        return [{"name": "环境变量 MOUNT_DDI_PYPI_INDEX", "index": env.rstrip("/"), "latency": 0}]
+    result = []
+    for name, index in _PYPI_SOURCES:
+        result.append({"name": name, "index": index.rstrip("/")})
+    return result
+
+
+def _read_pypi_index(candidate, timeout=8):
+    """用包索引页探测镜像是否可达。"""
+    started = time.monotonic()
+    url = candidate["index"] + "/pymobiledevice3/"
+    request = urllib.request.Request(url, headers={"User-Agent": _USER_AGENT})
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        data = response.read(256)
+    if not data:
+        raise ValueError("空响应")
+    candidate = dict(candidate)
+    candidate["latency"] = time.monotonic() - started
+    return candidate
+
+
+def _probe_pypi_sources():
+    """并发探测 PyPI 镜像，按响应速度排序。指定了 MOUNT_DDI_PYPI_INDEX 则跳过探测。"""
+    candidates = _pypi_index_candidates()
+    if len(candidates) == 1 and candidates[0].get("latency") == 0:
+        print("[*] 使用指定 PyPI 源：", candidates[0]["index"])
+        return candidates
+    print("[*] 正在自动探测可用 PyPI 镜像（国内源 + 官方）:")
+    available = []
+    with ThreadPoolExecutor(max_workers=len(candidates)) as executor:
+        futures = {executor.submit(_read_pypi_index, item): item for item in candidates}
+        for future in as_completed(futures):
+            item = futures[future]
+            try:
+                checked = future.result()
+                available.append(checked)
+                print("    [✓] %s 可用（%.2f 秒）" % (checked["name"], checked["latency"]))
+            except Exception as e:
+                reason = str(e).replace("\n", " ")[:100]
+                print("    [×] %s 不可用：%s" % (item["name"], reason))
+    available.sort(key=lambda item: item["latency"])
+    return available
+
+
+def _pip_install(index):
+    host = urllib.parse.urlparse(index).hostname or ""
+    cmd = [
+        sys.executable, "-m", "pip", "install", "-U", "pymobiledevice3",
+        "--index-url", index,
+        "--disable-pip-version-check",
+        "--timeout", "60",
+    ]
+    if host:
+        cmd.extend(["--trusted-host", host])
+    print("  $ pip install -U pymobiledevice3 --index-url", index)
+    subprocess.check_call(cmd)
+
+
 def ensure_dep():
     if _FROZEN or _has("pymobiledevice3"):
         return True  # exe 已内置 pymobiledevice3,无需 pip
     print("[*] 未装 pymobiledevice3,自动安装中(需联网)…")
-    try:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "-U", "pymobiledevice3"])
-        return True
-    except Exception as e:
-        print("[!] 自动安装失败。请手动执行:  pip install -U pymobiledevice3")
-        print("   ", e)
+    available = _probe_pypi_sources()
+    if not available:
+        print("[!] 没有探测到可用 PyPI 源，请检查网络或设置 MOUNT_DDI_PYPI_INDEX。")
+        print("    也可手动执行:  pip install -U pymobiledevice3")
         return False
+    last_error = None
+    for index, source in enumerate(available, 1):
+        print("\n[*] 选择 PyPI 源 %d/%d：%s" % (index, len(available), source["name"]))
+        try:
+            _pip_install(source["index"])
+            return True
+        except Exception as e:
+            last_error = e
+            print("[!] %s 安装失败：%s" % (source["name"], e))
+            if index < len(available):
+                print("[*] 正在自动切换下一个可用源…")
+    print("[!] 自动安装失败。请手动执行:  pip install -U pymobiledevice3")
+    if last_error:
+        print("   ", last_error)
+    return False
 
 
 def _here():

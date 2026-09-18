@@ -14,6 +14,8 @@
 ```
 
 首次会自动 `pip install pymobiledevice3`(纯 Python、跨平台的 iOS 设备工具)。
+安装依赖时会先探测阿里云、清华、华为云、中科大、腾讯云镜像，全部失败后再回退官方 PyPI。
+也可设置 `MOUNT_DDI_PYPI_INDEX` 指定企业内网或其他镜像。
 
 ### 打包成独立 exe(目标机免装 Python)
 

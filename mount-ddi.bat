@@ -1,6 +1,6 @@
 @echo off
-REM 一键挂载 DDI(Windows)。双击运行,或命令行 mount-ddi.bat
-REM 需要 Python 3(python.org 装,勾选 Add to PATH)。首次会自动 pip 安装 pymobiledevice3。
+REM One-click mount DDI on Windows. Double-click or run: mount-ddi.bat
+REM Requires Python 3 from python.org with Add to PATH. First run auto-installs pymobiledevice3.
 setlocal
 where python >nul 2>nul
 if %errorlevel%==0 (
@@ -10,8 +10,8 @@ if %errorlevel%==0 (
   if %errorlevel%==0 (
     py -3 "%~dp0mount-ddi.py" %*
   ) else (
-    echo [!] 没找到 Python。请到 https://www.python.org/downloads/ 安装 Python 3
-    echo     安装时务必勾选 "Add Python to PATH"。
+    echo [!] Python not found. Install Python 3 from https://www.python.org/downloads/
+    echo     Check Add Python to PATH during setup.
   )
 )
 echo.
